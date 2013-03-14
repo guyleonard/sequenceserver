@@ -19,6 +19,10 @@
 #
 # database: ~/blast_databases/
 
+# Conserved Domain Database Location
+#
+# cdd_dir: ~/cdd/
+
 # Port to run Sequence Server on.
 #
 # The app will then be accessible at http://your-ip:port. Defaults to 4567.

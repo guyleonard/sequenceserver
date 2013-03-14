@@ -10,6 +10,7 @@ require 'sequenceserver/sequencehelpers'
 require 'sequenceserver/sinatralikeloggerformatter'
 require 'sequenceserver/customisation'
 require 'sequenceserver/version'
+require 'sequenceserver/cdd'
 
 # Helper module - initialize the blast server.
 module SequenceServer
@@ -38,6 +39,12 @@ module SequenceServer
       # launch and preview SequenceServer without any configuration, and/or run
       # test suite.
       set :test_database, File.join(root, 'tests', 'database')
+
+      # No CDD database
+      #
+      # Sequenceserver shouldn't ship with the CDD as it's very large
+      # default should be no database
+      set :cdd_no, 'no'
 
       # path to example configuration file
       #
@@ -76,6 +83,11 @@ module SequenceServer
       # directory of the running app.
       set :database,    Proc.new{ File.expand_path(config['database']) rescue test_database }
 
+      # absolute path to the CDD directory
+      #
+      # Default is always no database
+      set :cdd_dir,    Proc.new{ File.expand_path(config['cdd_dir']) rescue cdd_no }
+
       # the port number to run Sequence Server standalone
       set :port,        Proc.new{ (config['port'] or 4567).to_i }
 
@@ -96,6 +108,9 @@ module SequenceServer
 
       # list of blast databases indexed by their hash value
       set :databases, {}
+
+      # list of one CDD
+      set :cdddc, {}
     end
 
     configure :development do
@@ -189,6 +204,20 @@ module SequenceServer
         databases.each do |id, database|
           log.info("Found #{database.type} database: #{database.title} at #{database.name}")
         end
+        
+        # Handle absense of CDD database or not
+        log.info("CDD status: #{cdd_dir} or #{cdd_no}")
+        if cdd_dir != 'no'
+          # scan for cdd database
+          self.cdddb = scan_blast_db(cdd_dir, binaries['blastdbcmd']).freeze
+            # Log the discovery of databases.
+            cdddb.each do |type, dbs|
+              dbs.each do |d|
+                log.info("Found #{type} cdd: #{d.title} at #{d.name}")
+                end
+            end
+        end
+
       rescue IOError => error
         log.fatal("Fail: #{error}")
         exit
@@ -285,6 +314,21 @@ module SequenceServer
         settings.databases[index].name
       }
       advanced_opts << " -num_threads #{settings.num_threads}"
+
+      # cdd interjects here
+      input_type = sequence_type.to_s
+      if settings.cdd_dir != 'no' and  input_type != 'nucleotide'
+        # It crashes unless I do whatever this is doing :s
+          settings.log.debug('settings.cdddb:   ' + settings.cdddb.inspect)
+          cdddb = params['db'][db_type].map{|index|
+            settings.cdddb[db_type][index.to_i].name
+          }
+          # Then we do the same as for blast
+          cdd = Cdd.blast_string_to_blast_archive(method, cdddb.join(' '), sequence, advanced_opts)
+          # log the command that was run
+          settings.log.info('Ran to cdd archive: ' + cdd.command) if settings.logging
+      end
+
 
       # run blast and log
       blast = Blast.new(method, sequence, databases.join(' '), advanced_opts)

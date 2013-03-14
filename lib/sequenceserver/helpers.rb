@@ -26,7 +26,8 @@ module SequenceServer
         end
 
         binaries = {}
-        %w|blastn blastp blastx tblastn tblastx blastdbcmd makeblastdb blast_formatter|.each do |method|
+        # rpsblast+ added to list
+        %w|blastn blastp blastx tblastn tblastx blastdbcmd makeblastdb blast_formatter rpsblast+|.each do |method|
           path = File.join(bin, method) rescue method
           if command?(path)
             binaries[method] = path
